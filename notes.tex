@@ -1,0 +1,375 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[left=1.1cm,right=1.2cm,top=1.4cm,bottom=1.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+
+
+\newcommand{\insImg}[2] { %
+	\begin{figure}[ht!] %
+		\centering %
+		\includegraphics{#1} %
+		\caption{#2} %
+		\label{overflow} %
+	\end{figure} %
+}
+
+\newcommand{\subscript}[1]{$_{\text{#1}}$}
+\newcommand{\superscript}[1]{$^{\text{#1}}$}
+
+\begin{document}
+
+\section{Definitions}
+synchronous system - 
+
+asynchronous system - 
+
+\section{Time synchronizations}
+
+Hardware clock, read by a node at time t $H(t)$. One computes software clock with $C(t) = \alpha * H(t) + \beta$.
+
+Clock is said to be correct to the real time with respect to a given bound if:
+\[(1-p)(t'-t) <= H(t')-H(t) <= (1+p)(t'-t)\]
+\begin{itemize}
+	\item its drift rate falls within a known bound - error of measuring time within real intervals is bounded
+ 	\item the clock is monotonic
+\end{itemize}
+
+Drift and ...!
+
+Synchronisation types:
+\begin{itemize}
+	\item internal - referenced to themselves - $|C_1(t)-C_2(t)| < D$
+	\item external - referenced to some external clock source $|C_1(t)-S(t)| < D$. This also implies that clocks are sync'd internally with $|C_1(t)-C_2(t)| < 2D$
+\end{itemize}
+Both below methods allow for internal and external synchronisation (the system is asynchronous).
+
+\subsection{Cristian's method}
+Sync clocks, when there is no bound on the transmission time - Cristian's Method. It's the client clock that initiates the synchronization.
+\begin{itemize}
+	\item p1: send message with time request at $t_0$
+	\item p2: receive at $[t_0 + T_{min}, t_0 + T_{round} - T_{min}]$, insert its time to the answer message
+	\item p1: receive response and have p2 time; 
+\end{itemize}
+Inaccuracy - due to p2 inserting its time in a bounded period, inaccuracy is $(T_{round} - 2T_{min})/2$.
+\insImg{cristians}{Messages exchange in Cristians model}
+problems:
+\begin{itemize}
+\item faulty server - no sync possible
+\item safety, when server is problematic
+\end{itemize}
+
+\subsection{Berkley algorithm}
+Master enforces synchronisation periodically. When master fails, another one is chosen, so no single-server problems should happen. Fault tolerance also by removing times which vary too much from others (e.g. by chosen maximum amount); accuracy up to 25ms;
+\begin{itemize}
+	\item m: foreach (s : slaves) send to slave poll request
+	\item $s_i$: sends back its current time $t_i$;
+	\item m: when all the replies are collected, average clocks (with its own) to determine the current time - $T_{avg}$;
+	\item m: foreach (s : slaves) send to i\superscript{th} $\Delta T_i = T_i - T$
+\end{itemize}
+
+\insImg{berkley}{Berkley time sync algorithm}
+
+\subsection{NTP}
+Synchronize clients with UTCC over Internet. Network of servers, where primary ones are directly connected to a time source such as radio clock getting UTC. Then, tree connection - strata - how many branches are between server and primary. Sync between strata \subscript{n} and strata\subscript{n-1}. The last server - user workstation. Errors accumulate within each server level - the higher the strata - the higher the error. 
+There is also sync going on between the same strata.
+
+NTP design goals:
+\begin{itemize}
+	\item sync to UTC - large and variable delays, but statistics and discrimination between quality of data from diff servers;
+	\item reliable - redundant servers and paths; reconfiguration;
+	\item many clients frequently connecting (to remove rates of drift) - scales to large number;
+	\item protection against interference - authentication and validated return address.
+\end{itemize}
+
+There may be non-negligible delay between msg rx and tx (e.g. with symmetric mode) -> we need to record the message transmission times. 
+\begin{align}
+&t_{i-2} = t_{i-3} + t + O_{true} \rightarrow O_{true} = t_{i-2} - t_{i-3} - t\\
+&t_{i} + O_{true} = t_{i-1} + t' \rightarrow O_{true} = t_{i-1} - t_{i} + t'\\
+&T_{round} = t + t' = (t_{i-2} - (t_{i-3} - O_{true}) + ( (t_{i} - O_{true}) - t_{i-1})) = t_{i-2} - t_{i-3} + t_{i} - t_{i-1}\\
+&\text{from first two:}\\
+&O_{true} = (\underbrace{t_{i-2} - t_{i-3} + t_{i-1} - t_{i}}_{2O_{guess}} - (t - t'))/2 = O_{guess} - (t-t')/2 \\
+&\text{hence: } O_{guess} - T_{round}/2 <= O_{true} <= O_{guess} + T_{round}/2, \text{since } t,t' > 0.
+\end{align}
+
+Modes: 
+\begin{itemize}
+	\item multicast mode - not accurate, only ihgh-speed lan, some purposes;
+	\item procedure call mode - like Crisitan's method; server responds to calls from higher-strata servers, ...
+	\item symmetric mode - highest accuracy, close to primary (lower strata servers);  servers retain timing information to improve accuracy over time;
+\end{itemize}
+They use UDP (unreliable); higher strata servers may synchronize to high degree of accuracy; 
+
+This is synchronisation to a bounded level of accuracy, but usually it's not tight enough.
+
+\insImg{ntp}{NTP message exchange between n and n-1 strata}
+
+\section {Ordering}
+We need synchronization beteen processes, but it's impossible to arbitrary precision (depends on applications); if not guaranteed - asynchronous system? but logical ordering may be provided - give order to events in a physcial casual fashion. Rules used:
+\begin{itemize}
+	\item process knows the order of events which it executes or observes
+	\item msg is sent before received
+\end{itemize}
+
+Happened before relation is defined with:
+\begin{itemize}
+	\item if two events happen in the same process and $e_1$ before $e_2$, then $e_1 \rightarrow e_2$
+	\item if $e_1$ is event of sending msg m, and $e_2$ of its receiving, $e_1 \rightarrow e_2$
+	\item if $e_1 \rightarrow e_2 \ and \ e_2 \rightarrow e_3 \ then \ e_1 \rightarrow e_3$
+If two evetns are not in happened before relation 
+\end{itemize}
+Concurrent events - no way to determine which occured first. 
+\subsection {Logical clocks - Lamport clock}
+Monotonically increasing counter. Each process $P_i$ maintains its own clock $L_i$, Logical ordering is satisfied with following rules:
+\begin{itemize}
+	\item $L_i++$ before event is issued at $P_i$
+	\item message sent by $P_i$ is piggybacked with its $t_m = L_i$
+	\item when process receives message, it sets its $L_j=max(L_j, t)++$
+\end{itemize}
+
+It's a partial ordering time, thus total ordering for tie-breaking could be defined as -> $(L_i(e_1), i) < (L_j(e2), j) \Leftrightarrow L_i(e_1) < L_j(e_2) \ or \ (L_i(e_1)==L_j(e_2) \ and \ i<j)$. No physical meaning.
+
+Meaning: event's timestamp (Lamport) is the longest chain of events that happened before e.
+
+\textbf{Note}:\\
+! Happened before induces Lamport clock relations but\\
+! Lamport clocks don't induce happened before.
+
+\subsection{Vector clocks}
+Introduced to overcome Lamport inability for $L(e) < L(e') \Rightarrow e \rightarrow e'$. This time entire vector is piggybacked to the message. 
+\begin{itemize}
+	\item for (p : processes) for (i : procNo) $V_p[i]=0$;
+	\item $p_i$: event happens (also tx or rx) $V_i[i]++$;
+	\item $p_i$: when receiving msg $for (k : procNo) V_i[k] = max(msgV[k], V_i[k]); V_i[i]++$;
+\end{itemize}
+
+Mening: $V_i[j]$ is the number of events in process $P_j$ that happened before \textbf{current} statte of process $P_i$
+
+\begin{itemize}
+	\item for comparisons all vector elements have to satisfy operator;
+	\item no total order - can't compare (1,0,1) with (0,1,0);
+	\item both are correct $L(e) < L(e') \Leftrightarrow e \rightarrow e'$
+\end{itemize}
+Cost paid for that is message size and memory consumption (proportionally to the number of processes). 
+
+\section{Global state}
+
+Good description on slides \href{https://www.kth.se/social/upload/504cfa18f27654461c000002/global%20state.pdf}{here}.
+
+
+Global history - union of all histories. 
+
+Cut - global history up to a specific event in each history. 
+
+Global state - the combination of all processes states and the states of the communication channels at instant time. Would be easy if accurately synchronized time. Otherwise, we need to find possible global state or states. This is done by assembling that state from the local states of process recorded at different but concurrent times. 
+
+\textbf{Consistent} cut can't violate happens-before relation. If $e_1 \rightarrow e_2$ if cut contains $e_2$, it has to contain $e_1$ as well. 
+
+Consistent global state is a set of n mutually concurrent events, one from each process $P_i$: $C = \{e_1,...,e_n\}, \ with \ e_i \|e_j, i \neq~$
+
+A \textbf{run} is a total ordering of all events in a global history that is consistent with each local history. (Run - total ordering of all event in a global history, which is consistent with the local history of each process $\rightarrow$ there may be many runs, just the order of events for the same process has to be the same (may be interleaved with other processes' events)).
+
+A \textbf{linearization} or consistent run is a run that describes transitions between consistent global states. (Linearization is a total ordering of all events in the global history, which is constistent with the happens before relation - all realizations are runs (but not always true the other way round)).
+
+A state S' is \textbf{reachable} from state S if there is a linearization from S to S'.
+
+System properties:
+\begin{itemize}
+	\item \textbf{safety} - bad property doesn't hold for any reachable state;
+	\item \textbf{liveness} - good property G always (eventually) holds for all reachable states.
+\end{itemize}
+
+\subsection{Chandy and Lamport / snapshots}
+Some properties are stable - they may never become true, but once it happened, they stay true.
+
+Snapshot algorithm for determining global states of distributed systems. Goal: record set of process and channel stats for a set of processes $p_i$ such that even though the combination of recorded states may never have occured at the same time, the recorded global state is consistent (this state has convenient properties). State is recorded at process, locally.
+
+Idea: each process records its state and also, for each incoming channel, a set of messages sent to it. The process records, for each channel, any messages that arrived after it recorded its state and before the sender recorded its own state. This arrangement allows us to record the states of processes at different times but to account for the differentials between process states in terms of messages transmitted but not yet received. If process p i has sent a message m to process p j , but p j has not received it, then we account for m as belonging to the state of the channel between them.
+
+
+Assumptions:
+\begin{itemize}
+	\item there is a path between any two pairs of processes - both directions;
+	\item any process may initiate global snapshot;
+	\item process may continue its execution, tx/rx messages while the snapshot is being taken;
+	\item channels and processes \textbf{don't fail}!
+	\item \textbf{reliable communication} every msg setn, arrives at destination exactly once;
+	\textbf{unidirectional channels} providing FIFO-ordered msg delivery.
+\end{itemize}
+
+When a node wants to start snapshot - it behaves as if it received marker msg from non-existing channel.
+When node \textbf{receives} receives marker, it \textbf{immediately} (before any other message) sends the marker message to all outgoing channels (also the one it got message from)
+\iffalse
+website: https://www.websequencediagrams.com/#
+P0->P0: marker(null)
+Note over P0: Record state\nStart rec rx on {c01, c02}
+P0->P1: marker(c01)
+Note over P1: Record state\nstate[c01]={};\nStart rec rx on {c12}
+P0->P2: marker(c02)
+Note over P2: Record state\nstate[c02]={};\nStart rec rx on {c12}
+P1->P0: marker(c01)
+Note over P0: Save rec'd c01 state
+P1->P2: marker(c12)
+Note over P2: Save rec'd c12 state
+P2->P0: marker(c02)
+Note over P0: Save rec'd c02 state
+P2->P1: marker(c12)
+Note over P1: Save rec'd c12 state
+\fi
+
+\insImg{chandy_lamport_1}{Chandy Lamport algorithm execution for 3 nodes}
+When \textbf{receiver} receives the marker over channel c 1) if it hasn't recorded its state yet
+\begin{itemize}
+	\item record process state;
+	\item record c state as the empty set;
+	\item turn on recording of msgs arriving on all other channels.
+\end{itemize}
+or else 2) 
+\begin{itemize}
+	\item record state of c as set of msgs it has recorded sicne $P_i$ first recorded its state;
+\end{itemize}
+
+The cut obtained this way is always consistent - global state is possible (but may not occur) $\rightarrow$ is reachable, thus this algorithm is useful for recording stable properties:
+\begin{align}\label{stable_props}
+	&(property == true \ in \ S_{snap}) \Rightarrow (property == true \ in \ S_{init})\\
+	&(property == false \ in \ S_{snap}) \Rightarrow (property == false \ in \ S_{init})
+\end{align}
+
+No work which depends upon the global state is done until the snapshot has been gathered. USeful for:
+\begin{itemize}
+	\item eval after infrequent changes;
+	\item stable properties (eqs \ref{stable_props});
+	\item props with yes/no answer (gc, not routing tables);
+	\item props not to be acted instantly (so good for gc).
+\end{itemize}
+
+\subsection{Distributed debugging}
+\textbf{TODO}\\
+\textbf{definitely}\\
+\textbf{possibly}\\
+\textbf{their relations}
+
+\section{Coordination and agreement}
+Processes must agree on something and be confident that peers agree. 
+
+\subsection{Mutual exclusion}
+Mutual exclusion - requirement of ensuring that no two concurrent processes are in their critical section at the same time. Single system - offered as a kernel's service (or languages help with it); Single server - it can provide such property. 
+
+Distributed system - via message passing. 
+Requirements:
+\begin{itemize}
+	\item \textbf{safety} - at most one process may enter CS;
+
+	\item Liveliness (enter and exit eventually) freedom from:
+		\begin{itemize}
+			\item \textbf{Deadlock} - two or more processes becoming stuck indefinitely while attempting to enter or exit the critical section, by virtue of their mutual interdependence.
+			\item\textbf{Starvation} - when absent starvation $\rightarrow$ fairness - to satisfy e.g. happened-before relation is used.
+		\end{itemize}
+	\item ordering - if one req happend=before another, then entry is acquired in that order.
+\end{itemize}
+
+Assumptions:
+\begin{itemize}
+	\item asynchronous system;
+	\item processes don't fail
+	\item msgs are delivered exactyl once.
+\end{itemize}
+Apps do following (only 1 cs, or only 1 cs at a time, or some other mean to prevent deadlock):
+\begin{itemize}
+	\item reqs for access to shared memory; blocks until granted;
+	\item use it exclusively (Critical section);
+	\item leave the shared resource (eventually).
+\end{itemize}
+
+\subsubsection{Central server}
+The simplest - like operating system. Server is an arbiter. 
+\begin{itemize}
+	\item client sends request for accessing CS to server;
+	\begin{itemize}
+		\item if server has free token, sends back to the client 
+		\item otherwise queues request and sends token when returned in FIFO fashion
+	\end{itemize}
+	\item when client got token, it accesses CS and returns token when done.
+\end{itemize}
+Satisfied safety and liveliness, but ordering. Server ma become a performance bottleneck. Two messages to get access, one for release. Two for synchronization (release to server and granted from server).
+
+\insImg{central_server_fairness}{The Fairness property though is not satisfied}
+
+$send(r_1) \rightarrow send(r_2)$ but $r_2$ is granted access first.
+
+\subsubsection{Ring-based}
+Overlaid ring structure. Token is passed around ring continuously. When process receives the token:
+\begin{itemize}
+	\item if it doesn't require access $\rightarrow$ pass it to following process;
+	\item otherwise keep the token, access CS, exit CS and pass the token.
+\end{itemize}
+
+Token could be lost, if there is a crash. Consumes network bandwidth, delay may be from 0..N messages (just passed on the token). Exit CS - just one message. Sync delay 1..N. Safety and Liveness properties satisfied but not Fairness.
+
+\subsubsection{Ricart and Agrwala}
+
+Processes maintain Lamport clock $\rightarrow$ partial ordering or total if procId is considered. Each process has three states \textbf{Released, Watned, Held}.
+
+Process $P_i$ requires entry to CS:
+\begin{itemize}
+	\item state = Wanted; multicast request \{$L_i, P_i$\};
+	\item waits for being granted permission from all the other processes.
+\end{itemize}
+
+Process $P_i$ receives request to enter CS. Depending on state:
+\begin{itemize}
+	\item \textbf{Released} $\rightarrow$ respond with permission granted;
+	\item \textbf{Held} $\rightarrow$ queue request; when done with CS, state = Released; grant permission to all waiting processes;
+	\item \textbf{Wanted} $\rightarrow$ - compare \{$L_i, P_i$\} with \{$L_j, P_j$\}:
+		\begin{itemize}
+			\item if our is older (was issued earlier) $\rightarrow$ queue request;
+			\item otherwise we were later $\rightarrow$ grant permission;
+		\end{itemize}
+\end{itemize}
+
+N-1 or 1 (hw support) message to multicast request and N-1 answers. Client delay - round-trip time. Synchronization delay - only one transmission time. 
+
+Safety satisfied, liveness and fairness due to Lamport clocks. 
+
+Improvements:
+\begin{itemize}
+	\item if process exiting CS wants to access it again and hasn't received other requests - it doesn't have to go over the cycle again;
+	\item improved by the authors (didn't read) to take up to N msgs without hw support.
+\end{itemize}
+
+\subsubsection{Maekawa's Voting Algorithm}
+Not all peers of a process need grant it access. Permission is needed only from a voting set of all the peers. All the voting sets (subsets of entire system) overlap, and each process is at least in one set. Processes vote for which group of processes contending for CS will be given access. Processes belonging to many group can vote only for one - ensures mutex.
+
+Each process $p_i$ is associated with a voting set $V_i$. Every set intersects with another (by at least one process). Voting sets are of the same size. 
+
+Each process grants access to CS only to one process at a time (it has already voted). But subsequent requests are queued. When mutex holding request exits CS, it sends Release to its voting set. Process in a voting set receives release msg, it may once again vote - does so for the head of the queue if not empty. 
+
+Requesting access:
+\begin{itemize}
+	\item state = Wanted; multicast request to processes in its $V_i$;
+	\item if permission is granted from all processes in $V_i$, state = Held;
+	\item oncefinished, state = Released, and multicast release to processes in $V_i$.
+\end{itemize}
+Voting process ($p_j$) receives request msg from $p_i$:
+\begin{itemize}
+	\item if (Held == state || true == voted), queue the request;
+	\item otherwise send permission granted to $p_i$, voted = true;
+\end{itemize}
+Voting process ($p_j$) receives release msg from $p_i$:
+\begin{itemize}
+	\item if no request in a queue - voted = false;
+	\item otherwise - send permission to the oldest request from a queue (popped, voted stays true).
+\end{itemize}
+
+Optimal solution which minimizes size of a set is choose of size to $\sqrt{N}$. 
+Requesting mutex takes $2\sqrt{N}$ messages and $\sqrt{n}$ to exit. Synchronization time is worse - round-trip time.
+
+Safety - by ensuring non-empty intersection, and process can vote only once.
+Liveness - as described, doesn't respect. Would if Lamport clocks were used.
+Fairness - Lamport clocks would satisfy.
+
+\end{document}
